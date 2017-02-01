@@ -1,0 +1,3 @@
+string behaviour
+string img_path
+string models_path
