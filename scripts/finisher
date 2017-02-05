@@ -1,0 +1,4 @@
+pkill -f 'roscore'
+pkill -f 'discode'
+pkill -f 'discode_task_sw'
+pkill -f 'python'

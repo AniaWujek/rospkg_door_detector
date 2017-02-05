@@ -1,0 +1,4 @@
+gnome-terminal -e "roscore"
+gnome-terminal -e "discode -TDoorDetector:podwojny_task"
+gnome-terminal -e "rosrun discode_ros discode_task_switcher"
+gnome-terminal -e "rosrun door_detector data_receiver.py"

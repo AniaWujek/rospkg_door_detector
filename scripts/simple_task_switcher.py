@@ -5,7 +5,7 @@ import rospy
 from std_srvs.srv import *
 
 if __name__ == "__main__":
-	rospy.wait_for_service('/Main/start')
-	ts = rospy.ServiceProxy('/Main/start', Empty)
+	rospy.wait_for_service('/Door/stop')
+	ts = rospy.ServiceProxy('/Door/stop', Empty)
 	print ts()
 	
