@@ -102,10 +102,7 @@ if __name__ == '__main__':
 	rospy.Subscriber("door_elements_position", Float32MultiArray, callback_elements_pos)
 	rospy.Subscriber("element_homog_matrix", Float32MultiArray, callback_element_homog)
 
-	publisher = rospy.Publisher('door_marker_array', Marker)
-	publisher2 = rospy.Publisher('elements_marker_array', Marker)
-
-	irpos = IRPOS("door", "Irp6ot", 7, "irp6ot_manager")
+	irpos = IRPOS("move", "Irp6ot", 7, "irp6ot_manager")
 
 	# # wylaczenie taskow na wszelki wypadek
 	# rospy.wait_for_service('/Door/stop')
@@ -128,118 +125,109 @@ if __name__ == '__main__':
 	# ts()
 
 	print "DOOR LOCALIZATION ACTIVE"
-
-	while not rospy.is_shutdown():
 		
 
-		actual_pose = irpos.get_cartesian_pose()
+	actual_pose = irpos.get_cartesian_pose()
 
-		# mnozenie macierzy:
-		# p_base = T_base_d * p_d
-		# T_base_d = T_base_tl6 * T_tl6_cam * T_cam_opt * T_opt_d
+	# mnozenie macierzy:
+	# p_base = T_base_d * p_d
+	# T_base_d = T_base_tl6 * T_tl6_cam * T_cam_opt * T_opt_d
 
-		door_homog_matrix_lock.acquire()
-		T_opt_d = door_homog_matrix
-		door_homog_matrix_lock.release()
+	a = raw_input("Kiedy odczytac macierz?")
+	door_homog_matrix_lock.acquire()
+	T_opt_d = door_homog_matrix
+	door_homog_matrix_lock.release()
 
-		T_cam_opt = numpy.matrix([[-1,0,0,0],[0,-1,0,0],[0,0,1,0],[0,0,0,1]])
-		T_tl6_cam = numpy.matrix([[0,-1,0,-0.0551],[1,0,0,0],[0,0,1,0.13],[0,0,0,1]])
-		pose = irpos.get_cartesian_pose()
-		qx = pose.orientation.x
-		qy = pose.orientation.y
-		qz = pose.orientation.z
-		qw = pose.orientation.w
-		px = pose.position.x
-		py = pose.position.y
-		pz = pose.position.z
-		quaternion = [qx, qy, qz, qw]
+	T_cam_opt = numpy.matrix([[-1,0,0,0],[0,-1,0,0],[0,0,1,0],[0,0,0,1]])
+	T_tl6_cam = numpy.matrix([[0,-1,0,-0.0551],[1,0,0,0],[0,0,1,0.13],[0,0,0,1]])
+	pose = irpos.get_cartesian_pose()
+	qx = pose.orientation.x
+	qy = pose.orientation.y
+	qz = pose.orientation.z
+	qw = pose.orientation.w
+	px = pose.position.x
+	py = pose.position.y
+	pz = pose.position.z
+	quaternion = [qx, qy, qz, qw]
 
-		T_base_tl6 = quaternion_matrix(quaternion) + numpy.matrix([[0,0,0,px],[0,0,0,py],[0,0,0,pz],[0,0,0,0]])
+	T_base_tl6 = quaternion_matrix(quaternion) + numpy.matrix([[0,0,0,px],[0,0,0,py],[0,0,0,pz],[0,0,0,0]])
 
-		T_base_d = T_base_tl6 * T_tl6_cam * T_cam_opt * T_opt_d
+	T_base_d = T_base_tl6 * T_tl6_cam * T_cam_opt * T_opt_d
 
-		door_points = door_pos_points
+	door_points = door_pos_points
 
-		base_door_points = []
-		for i in range(0,door_points.shape[0]):
-			p = numpy.matrix([[door_points[i,0]],[door_points[i,1]],[0.0],[1.0]])
-			base_door_points.append(T_base_d * p)
+	base_door_points = []
+	for i in range(0,door_points.shape[0]):
+		p = numpy.matrix([[door_points[i,0]],[door_points[i,1]],[0.0],[1.0]])
+		base_door_points.append(T_base_d * p)
 
-		marker = Marker()
-		marker.header.frame_id = "/tl_base"
-		marker.type = marker.TRIANGLE_LIST
-		marker.action = marker.ADD
-		marker.scale.x = 1.0
-		marker.scale.y = 1.0
-		marker.scale.z = 1.0
-		marker.color.a = 1.0
-		marker.color.g = 1.0
-		marker.pose.orientation.w = 1.0
-		p = Point()
-		p.x = base_door_points[0][0]
-		p.y = base_door_points[0][1]
-		p.z = base_door_points[0][2]		
-		
-		p1 = Point()
-		p1.x = base_door_points[1][0]
-		p1.y = base_door_points[1][1]
-		p1.z = base_door_points[1][2]
-		
-		p2 = Point()
-		p2.x = base_door_points[2][0]
-		p2.y = base_door_points[2][1]
-		p2.z = base_door_points[2][2]
+
+	a = raw_input("kiedy odczytac punkty?")
+	elements_points = elements_pos_points
+
+	base_elements_points = []
+	for i in range(0,elements_points.shape[0]):
+		p = numpy.matrix([[elements_points[i,0]],[elements_points[i,1]-0.1],[0.6],[1.0]])
+		base_elements_points.append(T_base_d * p)
+
 	
-		p3 = Point()
-		p3.x = base_door_points[3][0]
-		p3.y = base_door_points[3][1]
-		p3.z = base_door_points[3][2]
+
+	raw_input("kiedy rozpoczac ruch?")
+
+
+	p0 = base_door_points[0]
+	p1 = base_door_points[1]
+	p2 = base_door_points[2]
+
+	v0 = numpy.transpose(p0-p1)
+	v1 = numpy.transpose(p2-p1)
+
+	v0 = v0[0,0:3]
+	v1 = v1[0,0:3]
+
+	normal = numpy.cross(v1,v0)
+	normal = normal/numpy.linalg.norm(normal)
+
+	y = numpy.cross(normal,[0,1,0])
+	x = numpy.cross(y,normal)
+	z = normal
+
+	rot = numpy.concatenate((x,y,z),axis=0)
+	rot = numpy.transpose(rot)
 	
-		marker.points.append(p)
-		marker.points.append(p1)
-		marker.points.append(p2)
-		marker.points.append(p3)
-		marker.points.append(p2)
-		marker.points.append(p)
 
-		publisher.publish(marker)
+	b = numpy.matrix([0,0,0])
+	rot = numpy.concatenate((rot,b),axis=0)
+	b = numpy.matrix([[0],[0],[0],[1]])
+	rot = numpy.concatenate((rot,b),axis=1)
 
+	print rot
 
+	q = quaternion_from_matrix(rot)
 
+	element = 3
 
+	j_position = irpos.get_joint_position()
+	track_position = j_position[0]
+	dist = track_position - base_elements_points[element][1]
+	print dist
+	new_track = 1.06 + float(base_elements_points[element][1])
+	if new_track<0.0:
+		new_track = 0.0
+	new_j_position = ((new_track,)+ j_position[1:7])
+	print new_j_position
+	irpos.move_to_joint_position(new_j_position, 10)
+	point = Point(base_elements_points[element][0],base_elements_points[element][1],base_elements_points[element][2])
 
+	new_pose = Pose()
+	new_pose.position = point
+	new_pose.orientation.x = q[0]
+	new_pose.orientation.y = q[1]
+	new_pose.orientation.z = q[2]
+	new_pose.orientation.w = q[3]
 
-		elements_points = elements_pos_points
+	print new_pose
 
-		base_elements_points = []
-		for i in range(0,elements_points.shape[0]):
-			p = numpy.matrix([[elements_points[i,0]],[elements_points[i,1]],[0.3],[1.0]])
-			base_elements_points.append(T_base_d * p)
-
-		marker2 = Marker()
-		marker2.header.frame_id = "/tl_base"
-		marker2.type = marker.SPHERE_LIST
-		marker2.action = marker.ADD
-		marker2.scale.x = 0.1
-		marker2.scale.y = 0.1
-		marker2.scale.z = 0.1
-		marker2.color.a = 1.0
-		marker2.color.r = 1.0
-		marker2.pose.orientation.w = 1.0
-
-		for i in range(0,len(base_elements_points)):
-			p =Point()
-			p.x = base_elements_points[i][0]
-			p.y = base_elements_points[i][1]
-			p.z = base_elements_points[i][2]
-
-			marker2.points.append(p)
-
-		publisher.publish(marker)
-		publisher2.publish(marker2)	
-
-		print "**"
-		print base_elements_points
+	irpos.move_to_cartesian_pose(10.0, new_pose)
 		
-		
-		rospy.sleep(1.0)
+
